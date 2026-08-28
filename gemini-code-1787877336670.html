@@ -1,0 +1,1233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Supply Ledger</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Special+Elite&family=Zilla+Slab:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+:root{
+  --paper: #ECE8DE;
+  --paper-raised: #F5F2EA;
+  --ink: #1E2A44;
+  --ink-soft: #4B5468;
+  --line: #C8C2AF;
+  --brass: #A87F3B;
+  --brass-dark: #8A6A2F;
+  --green: #3F6552;
+  --green-bg: #E1E9E2;
+  --rust: #A6432D;
+  --rust-bg: #F1DFD8;
+  --font-display: 'Zilla Slab', Georgia, serif;
+  --font-tape: 'Special Elite', 'Courier New', monospace;
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+*{ box-sizing: border-box; }
+
+body{
+  margin:0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+.app-shell{
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 28px 20px 80px;
+}
+
+/* ---------- Header ---------- */
+.eyebrow{
+  font-family: var(--font-tape);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin: 0 0 4px;
+}
+h1.title{
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 34px;
+  margin: 0 0 22px;
+  letter-spacing: -0.01em;
+}
+
+/* ---------- Tape total bar ---------- */
+.tape{
+  position: relative;
+  background: var(--ink);
+  color: var(--paper-raised);
+  border-radius: 4px;
+  padding: 18px 22px 24px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 22px;
+  margin-bottom: 26px;
+}
+.tape::after{
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: -8px;
+  height: 10px;
+  background:
+    linear-gradient(135deg, var(--paper) 50%, transparent 50%) 0 0/10px 10px,
+    linear-gradient(-135deg, var(--paper) 50%, transparent 50%) 0 0/10px 10px;
+  background-repeat: repeat-x;
+}
+.tape-cell{ min-width: 120px; }
+.tape-label{
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.65;
+  margin: 0 0 4px;
+}
+.tape-value{
+  font-family: var(--font-tape);
+  font-size: 22px;
+  margin: 0;
+}
+.tape-value.rust{ color: #E3A08E; }
+.tape-value.green{ color: #9FCBAF; }
+.tape-value.brass{ color: #E3C081; }
+.tape-budget-row{
+  width:100%;
+  margin-top: 2px;
+}
+.tape-budget-row input{
+  background: transparent;
+  border: none;
+  border-bottom: 1px dashed rgba(255,255,255,0.35);
+  color: var(--paper-raised);
+  font-family: var(--font-tape);
+  font-size: 13px;
+  width: 90px;
+  padding: 2px 0;
+}
+.tape-budget-row input:focus{ outline: none; border-bottom-color: #E3C081; }
+.tape-budget-row label{
+  font-size: 11px;
+  opacity: 0.65;
+  margin-right: 6px;
+}
+
+/* ---------- Intake form ---------- */
+.intake{
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 20px 22px 18px;
+  margin-bottom: 30px;
+}
+.intake h2{
+  font-family: var(--font-display);
+  font-size: 17px;
+  margin: 0 0 14px;
+  font-weight: 600;
+}
+.form-grid{
+  display: grid;
+  grid-template-columns: 2fr 1.3fr 0.7fr 0.9fr;
+  gap: 12px 12px;
+}
+.form-grid .full{ grid-column: 1 / -1; }
+.field label{
+  display:block;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-bottom: 5px;
+}
+.field input, .field textarea{
+  width: 100%;
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--ink);
+}
+.field input:focus, .field textarea:focus{
+  outline: 2px solid var(--brass);
+  outline-offset: 0;
+  border-color: var(--brass);
+}
+.intake-actions{
+  display:flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+.hint{ font-size: 12px; color: var(--ink-soft); margin-right: auto; }
+.auto-tag{
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 10.5px;
+  color: var(--brass-dark);
+  font-weight: 400;
+  margin-left: 4px;
+}
+.detect-status{
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  min-height: 16px;
+}
+.detect-status.loading{ color: var(--brass-dark); }
+.detect-status.ok{ color: var(--green); }
+.detect-status.error{ color: var(--rust); }
+button{
+  font-family: var(--font-body);
+  cursor: pointer;
+}
+.btn-primary{
+  background: var(--ink);
+  color: var(--paper-raised);
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.btn-primary:hover{ background: #2A3A5C; }
+.btn-secondary{
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  padding: 8px 14px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+.btn-secondary:hover{ border-color: var(--brass); color: var(--brass-dark); }
+.btn-text{
+  background: none;
+  border: none;
+  color: var(--ink-soft);
+  font-size: 12px;
+  text-decoration: underline;
+  padding: 4px;
+}
+.btn-text:hover{ color: var(--rust); }
+
+/* ---------- Supplier sections ---------- */
+.section-label{
+  font-family: var(--font-tape);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin: 0 0 12px;
+}
+.supplier-card{
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+.supplier-head{
+  display:flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255,255,255,0.4);
+}
+.supplier-name{
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 600;
+  margin: 0;
+}
+.supplier-lifetime{
+  font-family: var(--font-tape);
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.po-block{ padding: 16px 18px; border-bottom: 1px solid var(--line); }
+.po-block:last-child{ border-bottom: none; }
+.po-header{
+  display:flex;
+  align-items:center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.po-number{
+  font-family: var(--font-tape);
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.stamp{
+  display:inline-block;
+  font-family: var(--font-tape);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 3px;
+  transform: rotate(-2deg);
+  border: 1.5px solid currentColor;
+}
+.stamp.pending{ color: var(--rust); background: var(--rust-bg); }
+.stamp.ordered{ color: var(--green); background: var(--green-bg); }
+
+table.items{
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+table.items th{
+  text-align: left;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  padding: 4px 6px 6px;
+  border-bottom: 1px solid var(--line);
+  font-weight: 600;
+}
+table.items td{
+  padding: 7px 6px;
+  border-bottom: 1px solid rgba(200,194,175,0.5);
+  vertical-align: middle;
+}
+table.items tr:last-child td{ border-bottom: none; }
+.item-name a{ color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--brass); }
+.item-name a:hover{ color: var(--brass-dark); }
+.item-name-nolink{ color: var(--ink); }
+.qty-input, .price-input{
+  width: 54px;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  font-family: var(--font-tape);
+  font-size: 12.5px;
+  background: #fff;
+}
+.price-input{ width: 66px; }
+.line-total{ font-family: var(--font-tape); font-size: 13px; }
+.row-delete{
+  background:none; border:none; color: var(--ink-soft); font-size: 15px; padding: 2px 6px; line-height:1;
+}
+.row-delete:hover{ color: var(--rust); }
+
+.po-footer{
+  display:flex;
+  justify-content: space-between;
+  align-items:center;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line);
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.po-subtotal{
+  font-family: var(--font-tape);
+  font-size: 15px;
+}
+.po-actions{ display:flex; gap:8px; flex-wrap: wrap; }
+.copy-flash{ font-size: 12px; color: var(--green); margin-left: 6px; }
+
+.history-toggle{
+  font-size: 12px;
+  color: var(--ink-soft);
+  background: none;
+  border: none;
+  text-decoration: underline;
+  padding: 2px;
+  margin-top: 4px;
+}
+
+/* ---------- Empty state ---------- */
+.empty{
+  text-align:center;
+  padding: 50px 20px;
+  color: var(--ink-soft);
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+}
+.empty p:first-child{
+  font-family: var(--font-display);
+  font-size: 20px;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+
+@media (max-width: 640px){
+  .form-grid{ grid-template-columns: 1fr 1fr; }
+  .tape{ gap: 16px; }
+  table.items{ font-size: 12.5px; }
+  table.items th:nth-child(2), table.items td:nth-child(2){ display:none; }
+}
+/* ---------- Who-row / sync status ---------- */
+.who-row{
+  display:flex;
+  align-items:center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+.who-row label{ font-weight: 600; }
+.who-row input{
+  font-family: var(--font-tape);
+  font-size: 13px;
+  padding: 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--paper-raised);
+  color: var(--ink);
+  width: 80px;
+  text-transform: uppercase;
+  text-align: center;
+}
+.who-row input:focus{ outline: 2px solid var(--brass); border-color: var(--brass); }
+.sync-status{ margin-left: auto; font-size: 11.5px; }
+.po-meta{ font-size: 11px; color: var(--ink-soft); display:block; margin-top: 2px; }
+
+/* ---------- Print header button ---------- */
+.print-bar{
+  display:flex;
+  flex-wrap: wrap;
+  justify-content:flex-end;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.btn-print{
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+}
+.btn-print:hover{ border-color: var(--brass); color: var(--brass-dark); }
+
+/* ---------- Print styles ---------- */
+@media print{
+  body{ background: #fff; }
+  .app-shell{ max-width: none; padding: 0 8px; }
+  .print-bar, .intake, #lookupBtn, .row-delete, .tape-budget-row, .history-toggle, #fileOpStatus, .who-row{ display:none !important; }
+  .tape{ background:#fff; color:#000; border:1px solid #000; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .tape::after{ display:none; }
+  .tape-value.rust, .tape-value.green, .tape-value.brass{ color:#000; }
+  .supplier-card{ border:1px solid #000; page-break-inside: avoid; break-inside: avoid; margin-bottom: 16px; }
+  .supplier-head{ background:#fff; border-bottom:1px solid #000; }
+  .po-block{ border-bottom:1px solid #999; }
+  .stamp{ border-color:#000 !important; background:#fff !important; color:#000 !important; transform:none; }
+  table.items th, table.items td{ border-bottom:1px solid #ccc; }
+  .qty-input, .price-input{ border:none; background:transparent; padding:0; -moz-appearance:textfield; }
+  .qty-input::-webkit-inner-spin-button, .qty-input::-webkit-outer-spin-button,
+  .price-input::-webkit-inner-spin-button, .price-input::-webkit-outer-spin-button{
+    -webkit-appearance:none; margin:0;
+  }
+  .po-actions button{ display:none !important; }
+  .copy-flash{ display:none !important; }
+  .print-hide{ display:none !important; }
+  a{ color:#000 !important; }
+}
+</style>
+</head>
+<body>
+<div class="app-shell">
+
+  <p class="eyebrow">Classroom Procurement</p>
+  <h1 class="title">Supply Ledger</h1>
+
+  <div class="who-row">
+    <label for="teacherCode">Teacher Code (2-3 letters):</label>
+    <input type="text" id="teacherCode" placeholder="ABC" maxlength="3" minlength="2" pattern="[A-Za-z]{2,3}" title="Please enter 2 or 3 letters">
+    <span class="sync-status" id="syncStatus">Shared ledger — synced just now</span>
+    <button type="button" class="btn-text" id="refreshBtn">Refresh</button>
+  </div>
+
+  <div class="print-bar">
+    <button type="button" class="btn-print" id="downloadPdfBtn">⬇ Download PDF</button>
+    <button type="button" class="btn-print" id="printAllBtn">🖨 Print</button>
+    <button type="button" class="btn-print" id="exportJsonBtn">⬇ Export JSON</button>
+    <button type="button" class="btn-print" id="importJsonBtn">⬆ Import JSON</button>
+    <input type="file" id="importJsonInput" accept="application/json" style="display:none">
+  </div>
+  <p class="detect-status" id="fileOpStatus" style="text-align:right;margin-top:-10px;"></p>
+
+  <div class="tape" id="tape">
+    <div class="tape-cell">
+      <p class="tape-label">Spent (ordered)</p>
+      <p class="tape-value green" id="tapeSpent">$0.00</p>
+    </div>
+    <div class="tape-cell">
+      <p class="tape-label">Pending (not yet ordered)</p>
+      <p class="tape-value rust" id="tapePending">$0.00</p>
+    </div>
+    <div class="tape-cell" id="tapeBudgetLeftWrap" style="display:none;">
+      <p class="tape-label">Budget left</p>
+      <p class="tape-value brass" id="tapeBudgetLeft">—</p>
+    </div>
+    <div class="tape-budget-row">
+      <label for="budgetInput">Set budget $</label>
+      <input type="number" id="budgetInput" min="0" step="0.01" placeholder="optional">
+    </div>
+  </div>
+
+  <div class="intake">
+    <h2>Add a product</h2>
+    <form id="addForm">
+      <div class="form-grid">
+        <div class="field full">
+          <label for="fUrl">Product link</label>
+          <input type="url" id="fUrl" required placeholder="https://... (paste a link and we'll fill in the rest)">
+          <p class="detect-status" id="detectStatus"></p>
+        </div>
+        <div class="field full">
+          <label for="fName">Product name <span class="auto-tag">auto-detected — editable</span></label>
+          <input type="text" id="fName" placeholder="Detected from link">
+        </div>
+        <div class="field">
+          <label for="fSupplier">Supplier <span class="auto-tag">auto</span></label>
+          <input type="text" id="fSupplier" list="supplierList" placeholder="Detected">
+          <datalist id="supplierList"></datalist>
+        </div>
+        <div class="field">
+          <label for="fPrice">Unit price $ <span class="auto-tag">auto</span></label>
+          <input type="number" id="fPrice" min="0" step="0.01" placeholder="Detected">
+        </div>
+        <div class="field">
+          <label for="fQty">Qty</label>
+          <input type="number" id="fQty" min="1" step="1" value="1">
+        </div>
+      </div>
+      <div class="intake-actions">
+        <button type="button" class="btn-secondary" id="lookupBtn">Look up again</button>
+        <button type="submit" class="btn-primary">Add to ledger</button>
+      </div>
+    </form>
+  </div>
+
+  <div id="suppliersWrap"></div>
+
+</div>
+
+<script>
+(function(){
+  const ITEM_PREFIX = 'item:';
+  const PO_PREFIX = 'po:';
+  const BUDGET_KEY = 'meta:budget';
+  const CODE_KEY = 'settings:teacherCode';
+
+  let items = [];
+  let purchaseOrders = [];
+  let budget = null;
+  let expandedHistory = {};
+  let teacherCode = '';
+  let syncing = false;
+
+  const fmt = (n) => '$' + (Math.round(n * 100) / 100).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+
+  function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+
+  function setSyncStatus(msg){
+    const el = document.getElementById('syncStatus');
+    if(el) el.textContent = msg;
+  }
+
+  // Fallback local storage helper if window.storage is absent
+  const store = window.storage || {
+    async list(prefix) {
+      const keys = Object.keys(localStorage).filter(k => k.startsWith(prefix));
+      return { keys };
+    },
+    async get(key) {
+      const val = localStorage.getItem(key);
+      return val ? { value: val } : null;
+    },
+    async set(key, val) {
+      localStorage.setItem(key, val);
+    },
+    async delete(key) {
+      localStorage.removeItem(key);
+    }
+  };
+
+  async function loadAllShared(){
+    try{
+      const [itemKeysRes, poKeysRes] = await Promise.all([
+        store.list(ITEM_PREFIX, true),
+        store.list(PO_PREFIX, true)
+      ]);
+      const itemKeys = (itemKeysRes && itemKeysRes.keys) || [];
+      const poKeys = (poKeysRes && poKeysRes.keys) || [];
+
+      const itemResults = await Promise.all(itemKeys.map(async k => {
+        try{ const r = await store.get(k, true); return r ? JSON.parse(r.value) : null; }
+        catch(e){ return null; }
+      }));
+      const poResults = await Promise.all(poKeys.map(async k => {
+        try{ const r = await store.get(k, true); return r ? JSON.parse(r.value) : null; }
+        catch(e){ return null; }
+      }));
+
+      items = itemResults.filter(Boolean);
+      purchaseOrders = poResults.filter(Boolean);
+    }catch(e){
+      console.error('load shared failed', e);
+    }
+    try{
+      const r = await store.get(BUDGET_KEY, true);
+      budget = r ? JSON.parse(r.value) : null;
+    }catch(e){ budget = null; }
+    document.getElementById('budgetInput').value = budget !== null ? budget : '';
+  }
+
+  async function loadTeacherCode(){
+    try{
+      const r = await store.get(CODE_KEY, false);
+      teacherCode = r ? JSON.parse(r.value) : '';
+    }catch(e){ teacherCode = ''; }
+    document.getElementById('teacherCode').value = teacherCode;
+  }
+
+  async function saveItemRecord(item){
+    try{ await store.set(ITEM_PREFIX + item.id, JSON.stringify(item), true); }
+    catch(e){ console.error('save item failed', e); }
+  }
+  async function deleteItemRecord(id){
+    try{ await store.delete(ITEM_PREFIX + id, true); }
+    catch(e){ console.error('delete item failed', e); }
+  }
+  async function savePORecord(po){
+    try{ await store.set(PO_PREFIX + po.id, JSON.stringify(po), true); }
+    catch(e){ console.error('save po failed', e); }
+  }
+  async function deletePORecord(id){
+    try{ await store.delete(PO_PREFIX + id, true); }
+    catch(e){ console.error('delete po failed', e); }
+  }
+  async function saveBudget(){
+    try{ await store.set(BUDGET_KEY, JSON.stringify(budget), true); }
+    catch(e){ console.error('save budget failed', e); }
+  }
+
+  async function dedupeAndRenumber(){
+    const bySupplierOpen = {};
+    purchaseOrders.forEach(po => {
+      if(po.status !== 'open') return;
+      (bySupplierOpen[po.supplier] = bySupplierOpen[po.supplier] || []).push(po);
+    });
+    for(const list of Object.values(bySupplierOpen)){
+      if(list.length <= 1) continue;
+      list.sort((a,b) => a.createdAt - b.createdAt);
+      const keep = list[0];
+      for(let i = 1; i < list.length; i++){
+        const extra = list[i];
+        const affected = items.filter(it => it.poId === extra.id);
+        for(const it of affected){
+          it.poId = keep.id;
+          await saveItemRecord(it);
+        }
+        purchaseOrders = purchaseOrders.filter(p => p.id !== extra.id);
+        await deletePORecord(extra.id);
+      }
+    }
+
+    const supplierGroups = {};
+    purchaseOrders.forEach(po => (supplierGroups[po.supplier] = supplierGroups[po.supplier] || []).push(po));
+    for(const list of Object.values(supplierGroups)){
+      list.sort((a,b) => a.createdAt - b.createdAt);
+      for(let idx = 0; idx < list.length; idx++){
+        if(list[idx].number !== idx + 1){
+          list[idx].number = idx + 1;
+          await savePORecord(list[idx]);
+        }
+      }
+    }
+  }
+
+  async function syncFromServer(showStatus){
+    if(syncing) return;
+    syncing = true;
+    if(showStatus) setSyncStatus('Syncing…');
+    await loadAllShared();
+    await dedupeAndRenumber();
+    render();
+    setSyncStatus('Synced ' + new Date().toLocaleTimeString());
+    syncing = false;
+  }
+
+  document.getElementById('refreshBtn').addEventListener('click', () => syncFromServer(true));
+  setInterval(() => syncFromServer(false), 20000);
+
+  document.getElementById('teacherCode').addEventListener('input', async function(){
+    this.value = this.value.toUpperCase().replace(/[^A-Z]/g, '');
+    teacherCode = this.value.trim();
+    try{ await store.set(CODE_KEY, JSON.stringify(teacherCode), false); }
+    catch(e){ console.error('save code failed', e); }
+  });
+
+  function guessSupplierFromUrl(url){
+    try{
+      const u = new URL(url);
+      let host = u.hostname.replace(/^www\./,'');
+      const parts = host.split('.');
+      const lastIsCountryCode = parts.length >= 1 && parts[parts.length - 1].length === 2;
+      const genericSecondLevel = new Set(['co','com','org','net','gov','edu','ac','ltd']);
+      let brandIndex;
+      if(parts.length >= 3 && lastIsCountryCode && genericSecondLevel.has(parts[parts.length - 2])){
+        brandIndex = parts.length - 3;
+      } else if(parts.length >= 2){
+        brandIndex = parts.length - 2;
+      } else {
+        brandIndex = 0;
+      }
+      const name = parts[brandIndex] || parts[0];
+      return name.charAt(0).toUpperCase() + name.slice(1);
+    }catch(e){ return ''; }
+  }
+
+  function guessNameFromUrl(url){
+    try{
+      const u = new URL(url);
+      let seg = u.pathname.split('/').filter(Boolean).pop() || '';
+      seg = seg.replace(/_p\d+$/i, '');
+      seg = seg.replace(/\.(html?|aspx?)$/i, '');
+      seg = seg.replace(/[-_]+/g, ' ').trim();
+      if(!seg) return '';
+      return seg.split(' ').map(w => w ? w.charAt(0).toUpperCase() + w.slice(1) : w).join(' ');
+    }catch(e){ return ''; }
+  }
+
+  function isValidUrl(str){
+    try{ new URL(str); return true; }catch(e){ return false; }
+  }
+
+  function setDetectStatus(msg, kind){
+    const el = document.getElementById('detectStatus');
+    el.textContent = msg;
+    el.className = 'detect-status' + (kind ? ' ' + kind : '');
+  }
+
+  let lastDetectedUrl = '';
+
+  // Direct scraping and price detection implementation
+  async function detectFromUrl(url){
+    if(!isValidUrl(url)) return;
+    lastDetectedUrl = url;
+    setDetectStatus('Looking up product details…', 'loading');
+    document.getElementById('lookupBtn').disabled = true;
+
+    try{
+      let name = null;
+      let price = null;
+      let supplier = guessSupplierFromUrl(url);
+
+      const response = await fetch(url, { mode: 'cors' }).catch(() => null);
+      if (response && response.ok) {
+        const htmlText = await response.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(htmlText, 'text/html');
+
+        const ogTitle = doc.querySelector('meta[property="og:title"]');
+        name = ogTitle ? ogTitle.getAttribute('content') : doc.title;
+
+        const priceMeta = doc.querySelector('meta[property="product:price:amount"]') || 
+                          doc.querySelector('meta[property="og:price:amount"]');
+        if (priceMeta) {
+          price = parseFloat(priceMeta.getAttribute('content'));
+        } else {
+          const match = htmlText.match(/\$?\s*(\d+\.\d{2})/);
+          if (match) price = parseFloat(match[1]);
+        }
+      }
+
+      if(!name) name = guessNameFromUrl(url);
+      if(lastDetectedUrl !== url) return;
+
+      if(name) document.getElementById('fName').value = name;
+      if(supplier) document.getElementById('fSupplier').value = supplier;
+      if(price !== null && !isNaN(price)){
+        document.getElementById('fPrice').value = price.toFixed(2);
+        setDetectStatus('Detected details successfully', 'ok');
+      } else {
+        setDetectStatus('Detected basic details — please verify the unit price', 'error');
+      }
+    }catch(e){
+      document.getElementById('fName').value = guessNameFromUrl(url);
+      document.getElementById('fSupplier').value = guessSupplierFromUrl(url);
+      setDetectStatus('Fallback applied — please check price', 'error');
+    }finally{
+      document.getElementById('lookupBtn').disabled = false;
+    }
+  }
+
+  document.getElementById('fUrl').addEventListener('blur', function(){
+    if(this.value && this.value !== lastDetectedUrl) detectFromUrl(this.value.trim());
+  });
+  document.getElementById('lookupBtn').addEventListener('click', function(){
+    const url = document.getElementById('fUrl').value.trim();
+    if(url) detectFromUrl(url);
+    else setDetectStatus('Paste a product link first', 'error');
+  });
+
+  // ---------- PO logic ----------
+  async function getOrCreateOpenPO(supplier){
+    let po = purchaseOrders.find(p => p.supplier === supplier && p.status === 'open');
+    if(po) return po;
+    const existingCount = purchaseOrders.filter(p => p.supplier === supplier).length;
+    po = {
+      id: uid(),
+      supplier,
+      number: existingCount + 1,
+      status: 'open',
+      createdAt: Date.now(),
+      orderedAt: null,
+      createdBy: teacherCode || '',
+      orderedBy: ''
+    };
+    purchaseOrders.push(po);
+    await savePORecord(po);
+    return po;
+  }
+
+  function poCode(supplier){
+    return supplier.replace(/[^a-zA-Z]/g,'').slice(0,3).toUpperCase() || 'GEN';
+  }
+
+  function lineTotal(item){ return (Number(item.qty)||0) * (Number(item.price)||0); }
+
+  function poTotal(po){
+    return items.filter(i => i.poId === po.id).reduce((s,i) => s + lineTotal(i), 0);
+  }
+
+  // ---------- add item ----------
+  document.getElementById('addForm').addEventListener('submit', async function(e){
+    e.preventDefault();
+    if (teacherCode.length < 2 || teacherCode.length > 3) {
+      alert('Please enter a valid 2 or 3 letter Teacher Code before adding items.');
+      document.getElementById('teacherCode').focus();
+      return;
+    }
+
+    const name = document.getElementById('fName').value.trim();
+    const url = document.getElementById('fUrl').value.trim();
+    let supplier = document.getElementById('fSupplier').value.trim();
+    const qty = Math.max(1, parseInt(document.getElementById('fQty').value) || 1);
+    const price = Math.max(0, parseFloat(document.getElementById('fPrice').value) || 0);
+
+    if(!name){
+      setDetectStatus('Add a product name before adding', 'error');
+      return;
+    }
+    if(!supplier) supplier = url ? (guessSupplierFromUrl(url) || 'Unspecified') : 'Unspecified';
+
+    const po = await getOrCreateOpenPO(supplier);
+    const item = { id: uid(), poId: po.id, name, url, supplier, qty, price, addedAt: Date.now(), addedBy: teacherCode || '' };
+    items.push(item);
+    await saveItemRecord(item);
+
+    this.reset();
+    document.getElementById('fQty').value = 1;
+    setDetectStatus('', '');
+    lastDetectedUrl = '';
+    render();
+  });
+
+  // ---------- budget ----------
+  let budgetTimer;
+  document.getElementById('budgetInput').addEventListener('input', function(){
+    clearTimeout(budgetTimer);
+    const val = this.value;
+    budgetTimer = setTimeout(async () => {
+      budget = val === '' ? null : Math.max(0, parseFloat(val) || 0);
+      await saveBudget();
+      renderTape();
+    }, 400);
+  });
+
+  // ---------- mutations from item rows ----------
+  window.__updateItemField = async function(id, field, value){
+    const item = items.find(i => i.id === id);
+    if(!item) return;
+    if(field === 'qty') item.qty = Math.max(1, parseInt(value) || 1);
+    if(field === 'price') item.price = Math.max(0, parseFloat(value) || 0);
+    await saveItemRecord(item);
+    render();
+  };
+
+  window.__deleteItem = async function(id){
+    items = items.filter(i => i.id !== id);
+    await deleteItemRecord(id);
+    render();
+  };
+
+  window.__markOrdered = async function(poId){
+    const po = purchaseOrders.find(p => p.id === poId);
+    if(!po) return;
+    po.status = 'ordered';
+    po.orderedAt = Date.now();
+    po.orderedBy = teacherCode || '';
+    await savePORecord(po);
+    render();
+  };
+
+  window.__toggleHistory = function(supplier){
+    expandedHistory[supplier] = !expandedHistory[supplier];
+    render();
+  };
+
+  window.__copyOrder = async function(poId){
+    const po = purchaseOrders.find(p => p.id === poId);
+    if(!po) return;
+    const poItems = items.filter(i => i.poId === po.id);
+    const lines = [
+      `Purchase Order — ${po.supplier}`,
+      `PO #: ${poCode(po.supplier)}-${String(po.number).padStart(3,'0')}`,
+      `Date: ${new Date(po.orderedAt || Date.now()).toLocaleDateString()}`,
+      '',
+      'Items:'
+    ];
+    poItems.forEach((it, idx) => {
+      lines.push(`${idx+1}. ${it.name} — Qty ${it.qty} x ${fmt(it.price)} = ${fmt(lineTotal(it))}${it.url ? ' (' + it.url + ')' : ''}`);
+    });
+    lines.push('', `Total: ${fmt(poTotal(po))}`);
+    const text = lines.join('\n');
+    try{
+      await navigator.clipboard.writeText(text);
+      flashCopy(poId);
+    }catch(e){
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try{ document.execCommand('copy'); flashCopy(poId); }catch(err){}
+      document.body.removeChild(ta);
+    }
+  };
+
+  function flashCopy(poId){
+    const el = document.getElementById('flash-' + poId);
+    if(el){
+      el.textContent = 'Copied!';
+      setTimeout(() => { el.textContent = ''; }, 1800);
+    }
+  }
+
+  window.__printPO = function(poId){
+    document.querySelectorAll('.po-block').forEach(el => {
+      if(el.dataset.poId !== poId) el.classList.add('print-hide');
+    });
+    document.querySelectorAll('.supplier-card').forEach(card => {
+      if(!card.querySelector('.po-block[data-po-id="' + poId + '"]')) card.classList.add('print-hide');
+    });
+    window.print();
+  };
+
+  window.addEventListener('afterprint', function(){
+    document.querySelectorAll('.print-hide').forEach(el => el.classList.remove('print-hide'));
+  });
+
+  document.getElementById('printAllBtn').addEventListener('click', function(){
+    window.print();
+  });
+
+  function setFileStatus(msg, kind){
+    const el = document.getElementById('fileOpStatus');
+    el.textContent = msg;
+    el.className = 'detect-status' + (kind ? ' ' + kind : '');
+  }
+
+  document.getElementById('downloadPdfBtn').addEventListener('click', function(){
+    try{
+      if(!window.jspdf){ throw new Error('jsPDF not loaded'); }
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+      const marginX = 40;
+      const pageBottom = 780;
+      let y = 46;
+
+      function ensureSpace(needed){
+        if(y + needed > pageBottom){ doc.addPage(); y = 46; }
+      }
+
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(18);
+      doc.text('Supply Ledger', marginX, y); y += 20;
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(90);
+      doc.text('Exported ' + new Date().toLocaleString(), marginX, y); y += 18;
+
+      const spentTotal = purchaseOrders.filter(p => p.status === 'ordered').reduce((s,p) => s + poTotal(p), 0);
+      const pendingTotal = purchaseOrders.filter(p => p.status === 'open').reduce((s,p) => s + poTotal(p), 0);
+      doc.setTextColor(20); doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+      doc.text('Spent (ordered): ' + fmt(spentTotal) + '      Pending: ' + fmt(pendingTotal) + (budget !== null ? '      Budget left: ' + fmt(budget - spentTotal) : ''), marginX, y);
+      y += 22;
+
+      const suppliers = [...new Set(purchaseOrders.map(p => p.supplier))].sort();
+
+      suppliers.forEach(supplier => {
+        const pos = purchaseOrders.filter(p => p.supplier === supplier).sort((a,b) => a.number - b.number);
+        const lifetime = pos.reduce((s,p) => s + poTotal(p), 0);
+        const hasAnyItems = pos.some(p => items.some(i => i.poId === p.id));
+        if(!hasAnyItems) return;
+
+        ensureSpace(24);
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(20);
+        doc.text(supplier + '  —  ' + fmt(lifetime) + ' lifetime', marginX, y);
+        y += 14;
+
+        pos.forEach(po => {
+          const poItems = items.filter(i => i.poId === po.id);
+          if(poItems.length === 0) return;
+          ensureSpace(30);
+          const code = poCode(po.supplier) + '-' + String(po.number).padStart(3, '0');
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(60);
+          doc.text('PO ' + code + '   ' + (po.status === 'ordered' ? 'ORDERED' + (po.orderedAt ? ' ' + new Date(po.orderedAt).toLocaleDateString() : '') : 'PENDING'), marginX, y);
+          y += 8;
+
+          doc.autoTable({
+            startY: y,
+            margin: { left: marginX, right: marginX },
+            styles: { fontSize: 9, cellPadding: 4 },
+            headStyles: { fillColor: [30, 42, 68] },
+            head: [['Item', 'Qty', 'Unit $', 'Line $']],
+            body: poItems.map(it => [it.name, String(it.qty), fmt(it.price), fmt(lineTotal(it))]),
+          });
+          y = doc.lastAutoTable.finalY + 6;
+          ensureSpace(16);
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(20);
+          doc.text('Subtotal: ' + fmt(poTotal(po)), marginX, y);
+          y += 20;
+        });
+        y += 6;
+      });
+
+      doc.save('supply-ledger-' + new Date().toISOString().slice(0,10) + '.pdf');
+      setFileStatus('PDF downloaded', 'ok');
+    }catch(e){
+      console.error(e);
+      setFileStatus('Could not generate the PDF — try Print instead', 'error');
+    }
+  });
+
+  document.getElementById('exportJsonBtn').addEventListener('click', function(){
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      format: 'supply-ledger-v1',
+      budget,
+      items,
+      purchaseOrders
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'supply-ledger-' + new Date().toISOString().slice(0,10) + '.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setFileStatus('JSON exported', 'ok');
+  });
+
+  document.getElementById('importJsonBtn').addEventListener('click', function(){
+    document.getElementById('importJsonInput').click();
+  });
+
+  document.getElementById('importJsonInput').addEventListener('change', function(e){
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = async function(evt){
+      try{
+        const incoming = JSON.parse(evt.target.result);
+        if(!Array.isArray(incoming.items) || !Array.isArray(incoming.purchaseOrders)){
+          throw new Error('Not a Supply Ledger file');
+        }
+
+        const idMap = {};
+        const newPOs = incoming.purchaseOrders.map(po => {
+          const newId = uid();
+          idMap[po.id] = newId;
+          return {
+            id: newId,
+            supplier: po.supplier || 'Unspecified',
+            number: po.number || 1,
+            status: po.status === 'ordered' ? 'ordered' : 'open',
+            createdAt: po.createdAt || Date.now(),
+            orderedAt: po.orderedAt || null,
+            createdBy: po.createdBy || teacherCode || '',
+            orderedBy: po.orderedBy || ''
+          };
+        });
+        const newItems = incoming.items
+          .filter(it => idMap[it.poId])
+          .map(it => ({
+            id: uid(),
+            poId: idMap[it.poId],
+            name: it.name || 'Untitled item',
+            url: it.url || '',
+            supplier: it.supplier || 'Unspecified',
+            qty: Math.max(1, parseInt(it.qty) || 1),
+            price: Math.max(0, parseFloat(it.price) || 0),
+            addedAt: it.addedAt || Date.now(),
+            addedBy: it.addedBy || teacherCode || ''
+          }));
+
+        await Promise.all(newPOs.map(po => savePORecord(po)));
+        await Promise.all(newItems.map(it => saveItemRecord(it)));
+
+        await syncFromServer(false);
+        setFileStatus(`Imported ${newItems.length} item${newItems.length===1?'':'s'} — merged into the shared ledger`, 'ok');
+      }catch(err){
+        console.error(err);
+        setFileStatus("Couldn't import that file — is it a Supply Ledger JSON export?", 'error');
+      }finally{
+        e.target.value = '';
+      }
+    };
+    reader.readAsText(file);
+  });
+
+  function renderTape(){
+    const spent = purchaseOrders.filter(p => p.status === 'ordered')
+      .reduce((s,p) => s + poTotal(p), 0);
+    const pending = purchaseOrders.filter(p => p.status === 'open')
+      .reduce((s,p) => s + poTotal(p), 0);
+    document.getElementById('tapeSpent').textContent = fmt(spent);
+    document.getElementById('tapePending').textContent = fmt(pending);
+    const wrap = document.getElementById('tapeBudgetLeftWrap');
+    if(budget !== null && !isNaN(budget)){
+      wrap.style.display = '';
+      const left = budget - spent;
+      document.getElementById('tapeBudgetLeft').textContent = (left < 0 ? '-' : '') + fmt(Math.abs(left));
+    } else {
+      wrap.style.display = 'none';
+    }
+  }
+
+  function renderSupplierList(){
+    const suppliers = [...new Set(items.map(i => i.supplier))].sort();
+    const dl = document.getElementById('supplierList');
+    dl.innerHTML = suppliers.map(s => `<option value="${escapeHtml(s)}">`).join('');
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function itemRow(item){
+    const link = item.url
+      ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener">${escapeHtml(item.name)}</a>`
+      : `<span class="item-name-nolink">${escapeHtml(item.name)}</span>`;
+    const addedTitle = item.addedBy ? ` title="Added by ${escapeHtml(item.addedBy)}"` : '';
+    return `
+      <tr${addedTitle}>
+        <td class="item-name">${link}</td>
+        <td>${item.url ? '<span style="font-size:11px;color:var(--ink-soft);">link ↗</span>' : ''}</td>
+        <td><input class="qty-input" type="number" min="1" value="${item.qty}" onchange="__updateItemField('${item.id}','qty',this.value)"></td>
+        <td><input class="price-input" type="number" min="0" step="0.01" value="${item.price}" onchange="__updateItemField('${item.id}','price',this.value)"></td>
+        <td class="line-total">${fmt(lineTotal(item))}</td>
+        <td><button class="row-delete" title="Remove" onclick="__deleteItem('${item.id}')">✕</button></td>
+      </tr>`;
+  }
+
+  function poBlock(po, isOpen){
+    const poItems = items.filter(i => i.poId === po.id);
+    if(poItems.length === 0 && !isOpen) return '';
+    const code = `${poCode(po.supplier)}-${String(po.number).padStart(3,'0')}`;
+    return `
+      <div class="po-block" data-po-id="${po.id}">
+        <div class="po-header">
+          <span>
+            <span class="po-number">PO ${code}${po.orderedAt ? ' · ordered ' + new Date(po.orderedAt).toLocaleDateString() : ''}</span>
+            ${(po.createdBy || po.orderedBy) ? `<span class="po-meta">${po.status === 'ordered' && po.orderedBy ? 'Ordered by ' + escapeHtml(po.orderedBy) : (po.createdBy ? 'Started by ' + escapeHtml(po.createdBy) : '')}</span>` : ''}
+          </span>
+          <span class="stamp ${po.status === 'ordered' ? 'ordered' : 'pending'}">${po.status === 'ordered' ? 'Ordered' : 'Pending'}</span>
+        </div>
+        ${poItems.length ? `
+        <table class="items">
+          <thead><tr><th>Item</th><th></th><th>Qty</th><th>Unit $</th><th>Line $</th><th></th></tr></thead>
+          <tbody>${poItems.map(itemRow).join('')}</tbody>
+        </table>` : `<p style="font-size:13px;color:var(--ink-soft);margin:6px 0;">No items yet.</p>`}
+        <div class="po-footer">
+          <span class="po-subtotal">Subtotal: ${fmt(poTotal(po))}</span>
+          <div class="po-actions">
+            ${poItems.length ? `<button class="btn-secondary" onclick="__copyOrder('${po.id}')">Copy order text</button>` : ''}
+            ${poItems.length ? `<button class="btn-secondary" onclick="__printPO('${po.id}')">Print this order</button>` : ''}
+            ${po.status === 'open' && poItems.length ? `<button class="btn-secondary" onclick="__markOrdered('${po.id}')">Mark as ordered</button>` : ''}
+            <span class="copy-flash" id="flash-${po.id}"></span>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function render(){
+    renderTape();
+    renderSupplierList();
+
+    const wrap = document.getElementById('suppliersWrap');
+    if(items.length === 0){
+      wrap.innerHTML = `
+        <div class="empty">
+          <p>The ledger is empty</p>
+          <p>Paste in a product link above and it'll start sorting itself into purchase orders by supplier.</p>
+        </div>`;
+      return;
+    }
+
+    const suppliers = [...new Set(purchaseOrders.map(p => p.supplier))];
+    suppliers.sort((a,b) => {
+      const lastA = Math.max(0, ...items.filter(i=>i.supplier===a).map(i=>i.addedAt));
+      const lastB = Math.max(0, ...items.filter(i=>i.supplier===b).map(i=>i.addedAt));
+      return lastB - lastA;
+    });
+
+    wrap.innerHTML = suppliers.map(supplier => {
+      const pos = purchaseOrders.filter(p => p.supplier === supplier)
+        .sort((a,b) => b.number - a.number);
+      const openPO = pos.find(p => p.status === 'open');
+      const orderedPOs = pos.filter(p => p.status === 'ordered' && items.some(i => i.poId === p.id));
+      const lifetime = pos.reduce((s,p) => s + poTotal(p), 0);
+      const isExpanded = !!expandedHistory[supplier];
+
+      return `
+        <div class="supplier-card">
+          <div class="supplier-head">
+            <p class="supplier-name">${escapeHtml(supplier)}</p>
+            <span class="supplier-lifetime">${fmt(lifetime)} lifetime</span>
+          </div>
+          ${openPO ? poBlock(openPO, true) : ''}
+          ${orderedPOs.length ? `
+            <div style="padding: 4px 18px 14px;">
+              <button class="history-toggle" onclick="__toggleHistory('${escapeHtml(supplier)}')">
+                ${isExpanded ? 'Hide' : 'Show'} ${orderedPOs.length} past order${orderedPOs.length>1?'s':''}
+              </button>
+            </div>
+            ${isExpanded ? orderedPOs.map(p => poBlock(p, false)).join('') : ''}
+          ` : ''}
+        </div>`;
+    }).join('');
+  }
+
+  (async function init(){
+    await loadTeacherCode();
+    await syncFromServer(false);
+  })();
+})();
+</script>
+</body>
+</html>
